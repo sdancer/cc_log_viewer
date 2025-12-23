@@ -25,11 +25,48 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/log_viewer"
 import topbar from "../vendor/topbar"
 
+// Custom hooks
+const Hooks = {
+  Splitter: {
+    mounted() {
+      const splitter = this.el
+      const container = splitter.parentElement
+      const leftPanel = splitter.previousElementSibling
+      let isResizing = false
+
+      splitter.addEventListener('mousedown', (e) => {
+        isResizing = true
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+      })
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return
+        const containerRect = container.getBoundingClientRect()
+        const newWidth = e.clientX - containerRect.left
+        const minWidth = 200
+        const maxWidth = containerRect.width - 300
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+          leftPanel.style.width = `${newWidth}px`
+          leftPanel.style.flexGrow = '0'
+          leftPanel.style.flexShrink = '0'
+        }
+      })
+
+      document.addEventListener('mouseup', () => {
+        isResizing = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      })
+    }
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ...Hooks},
 })
 
 // Show progress bar on live navigation and form submits

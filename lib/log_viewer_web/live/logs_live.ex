@@ -170,13 +170,14 @@ defmodule LogViewerWeb.LogsLive do
       <!-- Main content -->
       <div class="flex-1 flex overflow-hidden">
         <!-- Log list -->
-        <div class={"flex-1 overflow-auto p-2 " <> if(@selected_log, do: "w-1/2", else: "")}>
+        <div class={"overflow-auto p-2 " <> if(@selected_log, do: "w-1/2", else: "flex-1")} style={if @selected_log, do: "min-width: 200px;", else: ""}>
           <table class="table table-xs table-zebra w-full">
             <thead class="sticky top-0 bg-base-100">
               <tr>
                 <th class="w-24">Time</th>
                 <th class="w-20">Type</th>
                 <th class="w-16">Method</th>
+                <th class="w-28">Model</th>
                 <th>URL</th>
                 <th class="w-16">Status</th>
               </tr>
@@ -197,6 +198,11 @@ defmodule LogViewerWeb.LogsLive do
                   <td>
                     <span class={"badge badge-xs " <> method_color(log.method)}><%= log.method %></span>
                   </td>
+                  <td class="text-xs">
+                    <%= if log[:parsed] && log.parsed[:model] do %>
+                      <span class="badge badge-xs badge-primary"><%= short_model(log.parsed.model) %></span>
+                    <% end %>
+                  </td>
                   <td class="font-mono text-xs truncate max-w-md" title={log.url}>
                     <%= truncate_url(log.url) %>
                   </td>
@@ -209,9 +215,14 @@ defmodule LogViewerWeb.LogsLive do
           </table>
         </div>
 
+        <!-- Splitter -->
+        <%= if @selected_log do %>
+          <div id="splitter" phx-hook="Splitter" class="w-1 bg-base-300 hover:bg-primary cursor-col-resize flex-shrink-0"></div>
+        <% end %>
+
         <!-- Detail panel -->
         <%= if @selected_log do %>
-          <div class="w-1/2 border-l border-base-300 bg-base-100 overflow-auto">
+          <div class="flex-1 min-w-[300px] border-l border-base-300 bg-base-100 overflow-auto">
             <div class="sticky top-0 bg-base-100 p-3 border-b flex justify-between items-center">
               <span class="font-bold">Request Details</span>
               <button class="btn btn-xs btn-ghost" phx-click="close_detail">✕</button>
@@ -363,6 +374,16 @@ defmodule LogViewerWeb.LogsLive do
   defp message_bg("user"), do: "bg-blue-900/30 border-l-2 border-blue-500"
   defp message_bg("assistant"), do: "bg-green-900/30 border-l-2 border-green-500"
   defp message_bg(_), do: "bg-base-300"
+
+  defp short_model(nil), do: ""
+  defp short_model(model) do
+    model
+    |> String.replace("claude-", "")
+    |> String.replace("-20251001", "")
+    |> String.replace("-20251101", "")
+    |> String.replace("-20250219", "")
+    |> String.replace("-latest", "")
+  end
 
   defp render_content_block(%{type: "text", text: text}) do
     assigns = %{text: text}

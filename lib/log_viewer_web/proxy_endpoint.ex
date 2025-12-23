@@ -14,6 +14,13 @@ defmodule LogViewerWeb.ProxyEndpoint do
 
     correlation_id = generate_id()
 
+    # Parse message body for /v1/messages requests
+    parsed = if String.contains?(conn.request_path, "/v1/messages") do
+      LogViewer.MessageParser.parse(body)
+    else
+      nil
+    end
+
     # Broadcast request log
     log = %{
       id: generate_id(),
@@ -24,6 +31,7 @@ defmodule LogViewerWeb.ProxyEndpoint do
       url: build_request_url(conn),
       headers: Enum.into(conn.req_headers, %{}),
       body_preview: truncate_body(body),
+      parsed: parsed,
       status: nil,
       status_text: nil
     }

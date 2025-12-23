@@ -11,7 +11,8 @@ defmodule LogViewer.Application do
       LogViewerWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:log_viewer, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: LogViewer.PubSub},
-      # ETS-backed log storage - survives LiveView crashes
+      # ETS-backed caches
+      LogViewer.ToolCache,
       LogViewer.LogStore,
       # Start to serve requests, typically the last entry
       LogViewerWeb.Endpoint,

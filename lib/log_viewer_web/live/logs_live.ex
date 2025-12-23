@@ -260,18 +260,90 @@ defmodule LogViewerWeb.LogsLive do
                 </details>
               <% end %>
 
-              <%= if @selected_log.body_preview do %>
-                <div>
-                  <h3 class="font-semibold text-sm opacity-70">Request Body</h3>
-                  <pre class="bg-base-200 rounded p-2 text-xs overflow-x-auto whitespace-pre-wrap max-h-96"><%= format_json(@selected_log.body_preview) %></pre>
+              <%= if @selected_log[:parsed] do %>
+                <!-- Parsed API Request -->
+                <div class="space-y-3">
+                  <!-- Model & Settings -->
+                  <div class="flex flex-wrap gap-2 text-xs">
+                    <span class="badge badge-primary"><%= @selected_log.parsed.model %></span>
+                    <span class="badge badge-ghost">max: <%= @selected_log.parsed.max_tokens %></span>
+                    <%= if @selected_log.parsed.stream do %>
+                      <span class="badge badge-info badge-outline">stream</span>
+                    <% end %>
+                    <%= if @selected_log.parsed.tool_count > 0 do %>
+                      <span class="badge badge-secondary"><%= @selected_log.parsed.tool_count %> tools</span>
+                    <% end %>
+                  </div>
+
+                  <!-- System Prompt -->
+                  <%= if @selected_log.parsed.system do %>
+                    <details class="collapse collapse-arrow bg-base-200">
+                      <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
+                        System Prompt
+                      </summary>
+                      <div class="collapse-content">
+                        <%= for block <- @selected_log.parsed.system do %>
+                          <div class="text-xs whitespace-pre-wrap"><%= block.text || inspect(block) %></div>
+                        <% end %>
+                      </div>
+                    </details>
+                  <% end %>
+
+                  <!-- Tools -->
+                  <%= if @selected_log.parsed.tool_refs != [] do %>
+                    <details class="collapse collapse-arrow bg-base-200">
+                      <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
+                        Tools (<%= length(@selected_log.parsed.tool_refs) %>)
+                      </summary>
+                      <div class="collapse-content">
+                        <div class="flex flex-wrap gap-1">
+                          <%= for ref <- @selected_log.parsed.tool_refs do %>
+                            <span class="badge badge-outline badge-sm cursor-pointer" title={ref.hash}>
+                              <%= ref.name %>
+                            </span>
+                          <% end %>
+                        </div>
+                      </div>
+                    </details>
+                  <% end %>
+
+                  <!-- Messages -->
+                  <div>
+                    <h3 class="font-semibold text-sm opacity-70 mb-2">Messages (<%= length(@selected_log.parsed.messages) %>)</h3>
+                    <div class="space-y-2 max-h-96 overflow-y-auto">
+                      <%= for msg <- @selected_log.parsed.messages do %>
+                        <div class={"rounded p-2 text-xs " <> message_bg(msg.role)}>
+                          <div class="font-semibold mb-1 opacity-70"><%= msg.role %></div>
+                          <%= for block <- msg.content do %>
+                            <%= render_content_block(block) %>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
                 </div>
+              <% else %>
+                <%= if @selected_log.body_preview do %>
+                  <details class="collapse collapse-arrow bg-base-200">
+                    <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
+                      Request Body
+                    </summary>
+                    <div class="collapse-content">
+                      <pre class="text-xs overflow-x-auto whitespace-pre-wrap max-h-96"><%= format_json(@selected_log.body_preview) %></pre>
+                    </div>
+                  </details>
+                <% end %>
               <% end %>
 
               <%= if @selected_log[:response_body] do %>
-                <div>
-                  <h3 class="font-semibold text-sm opacity-70">Response Body</h3>
-                  <pre class="bg-base-200 rounded p-2 text-xs overflow-x-auto whitespace-pre-wrap max-h-96"><%= format_json(@selected_log.response_body) %></pre>
-                </div>
+                <details class="collapse collapse-arrow bg-base-200" open>
+                  <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
+                    Response
+                  </summary>
+                  <div class="collapse-content">
+                    <pre class="text-xs overflow-x-auto whitespace-pre-wrap max-h-96"><%= format_json(@selected_log.response_body) %></pre>
+                  </div>
+                </details>
               <% end %>
             </div>
           </div>
@@ -286,5 +358,65 @@ defmodule LogViewerWeb.LogsLive do
       {:ok, decoded} -> Jason.encode!(decoded, pretty: true)
       _ -> str
     end
+  end
+
+  defp message_bg("user"), do: "bg-blue-900/30 border-l-2 border-blue-500"
+  defp message_bg("assistant"), do: "bg-green-900/30 border-l-2 border-green-500"
+  defp message_bg(_), do: "bg-base-300"
+
+  defp render_content_block(%{type: "text", text: text}) do
+    assigns = %{text: text}
+    ~H"""
+    <div class="whitespace-pre-wrap"><%= @text %></div>
+    """
+  end
+
+  defp render_content_block(%{type: "tool_use", name: name, input: input}) do
+    assigns = %{name: name, input: input}
+    ~H"""
+    <div class="bg-base-300 rounded p-1 my-1">
+      <span class="badge badge-warning badge-xs">tool_use</span>
+      <span class="font-mono text-warning"><%= @name %></span>
+      <pre class="text-xs opacity-70 mt-1 max-h-32 overflow-auto"><%= Jason.encode!(@input, pretty: true) %></pre>
+    </div>
+    """
+  end
+
+  defp render_content_block(%{type: "tool_result", tool_use_id: id, content: content}) do
+    assigns = %{id: id, content: content}
+    ~H"""
+    <div class="bg-base-300 rounded p-1 my-1">
+      <span class="badge badge-success badge-xs">tool_result</span>
+      <span class="font-mono text-xs opacity-50"><%= @id %></span>
+      <pre class="text-xs mt-1 max-h-32 overflow-auto whitespace-pre-wrap"><%= @content %></pre>
+    </div>
+    """
+  end
+
+  defp render_content_block(%{type: "thinking", thinking: thinking}) do
+    assigns = %{thinking: thinking}
+    ~H"""
+    <details class="bg-base-300 rounded p-1 my-1">
+      <summary class="cursor-pointer text-xs opacity-70">
+        <span class="badge badge-ghost badge-xs">thinking</span>
+        <%= String.slice(@thinking || "", 0, 50) %>...
+      </summary>
+      <pre class="text-xs mt-1 whitespace-pre-wrap"><%= @thinking %></pre>
+    </details>
+    """
+  end
+
+  defp render_content_block(%{type: "image"}) do
+    assigns = %{}
+    ~H"""
+    <div class="badge badge-outline badge-xs">image</div>
+    """
+  end
+
+  defp render_content_block(block) do
+    assigns = %{block: block}
+    ~H"""
+    <pre class="text-xs opacity-50"><%= inspect(@block) %></pre>
+    """
   end
 end

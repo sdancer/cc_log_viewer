@@ -100,6 +100,7 @@ defmodule LogViewer.LogStore do
       headers: request.headers,
       response_headers: Map.get(response, :response_headers, %{}),
       body_preview: request.body_preview,
+      parsed: Map.get(request, :parsed),
       response_body: response.response_body,
       status: response.status,
       status_text: response.status_text
